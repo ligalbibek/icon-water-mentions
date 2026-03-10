@@ -1,0 +1,24 @@
+name: Daily RSS Fetch & Commit
+
+on:
+  schedule:
+    - cron: '0 20 * * *'    # Every day at 8:00 AM AEDT (UTC+11 → 21:00 UTC previous day, adjust as needed)
+  workflow_dispatch:        # Allows manual run from GitHub UI
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch RSS
+        run: |
+          curl -L -o data/icon-water-rss.xml "${{ secrets.RSS_URL }}"
+
+      - name: Commit changes if any
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add data/icon-water-rss.xml
+          git commit -m "Daily RSS update $(date +'%Y-%m-%d')" || echo "No changes"
+          git push
