@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Icon Water Mentions Monitor</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    h1 { text-align: center; color: #0066cc; }
+    #search { width: 100%; padding: 12px; font-size: 1.1rem; margin: 20px 0; box-sizing: border-box; }
+    .mention { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin: 16px 0; background: #f9f9f9; }
+    .mention h3 { margin: 0 0 8px; font-size: 1.3rem; }
+    .mention .date { color: #666; font-size: 0.95rem; }
+    .mention a { color: #0066cc; text-decoration: none; }
+    .mention a:hover { text-decoration: underline; }
+    #loading, #error { text-align: center; font-style: italic; color: #555; }
+    footer { text-align: center; margin-top: 40px; font-size: 0.9rem; color: #777; }
+  </style>
+</head>
+<body>
+  <h1>Icon Water Mentions (Last 6 Months)</h1>
+  <p style="text-align:center;">Updated daily • Powered by Google Alerts + GitHub Pages</p>
+
+  <input type="text" id="search" placeholder="Search mentions (title, source, description)..." />
+
+  <div id="loading">Loading recent mentions...</div>
+  <div id="error" style="display:none; color:red;"></div>
+  <div id="mentions"></div>
+
+  <footer>
+    Last updated: <span id="last-updated">—</span><br>
+    <a href="https://github.com/YOUR-USERNAME/icon-water-mentions" target="_blank">GitHub repo</a> • Data from public sources
+  </footer>
+
+  <script>
+    const RSS_URL = "https://YOUR-GOOGLE-ALERTS-RSS-LINK-HERE"; // ← Replace this!
+    const SIX_MONTHS_AGO = Date.now() - (180 * 24 * 60 * 60 * 1000);
+
+    async function loadMentions() {
+      const container = document.getElementById("mentions");
+      const loading = document.getElementById("loading");
+      const errorDiv = document.getElementById("error");
+
+      try {
+        const response = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(RSS_URL)}`);
+        if (!response.ok) throw new Error("Failed to fetch RSS");
+
+        const text = await response.text();
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(text, "text/xml");
+
+        const items = xml.querySelectorAll("item");
+        const mentions = [];
+
+        items.forEach(item => {
+          const title = item.querySelector("title")?.textContent || "";
+          const link = item.querySelector("link")?.textContent || "";
+          const pubDateStr = item.querySelector("pubDate")?.textContent || "";
+          const desc = item.querySelector("description")?.textContent || "";
+
+          const pubDate = new Date(pubDateStr);
+          if (isNaN(pubDate.getTime()) || pubDate < SIX_MONTHS_AGO) return;
+
+          mentions.push({ title, link, date: pubDate.toLocaleDateString("en-AU"), desc });
+        });
+
+        // Sort newest first
+        mentions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        renderMentions(mentions);
+        document.getElementById("last-updated").textContent = new Date().toLocaleString("en-AU");
+      } catch (err) {
+        errorDiv.textContent = "Error loading mentions: " + err.message + " (check RSS URL)";
+        errorDiv.style.display = "block";
+      } finally {
+        loading.style.display = "none";
+      }
+    }
+
+    function renderMentions(mentions) {
+      const container = document.getElementById("mentions");
+      container.innerHTML = mentions.length === 0
+        ? "<p>No mentions found in the last 6 months.</p>"
+        : mentions.map(m => `
+            <div class="mention">
+              <h3>${m.title}</h3>
+              <div class="date">${m.date}</div>
+              <p>${m.desc}</p>
+              <a href="${m.link}" target="_blank" rel="noopener">Read more →</a>
+            </div>
+          `).join("");
+    }
+
+    // Live search
+    document.getElementById("search").addEventListener("input", e => {
+      const term = e.target.value.toLowerCase();
+      const all = Array.from(document.querySelectorAll(".mention"));
+      all.forEach(el => {
+        const text = el.textContent.toLowerCase();
+        el.style.display = text.includes(term) ? "" : "none";
+      });
+    });
+
+    // Load on page open
+    loadMentions();
+  </script>
+</body>
+</html>
